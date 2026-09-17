@@ -1,1115 +1,746 @@
-import tkinter as tk
-from tkinter import messagebox
-import random
-import winsound
-import threading
-
-
-class NumberGuessingGame:
-
-    def __init__(self, root):
-
-        self.root = root
-
-        # ================= WINDOW =================
-
-        self.root.title("Number Guessing Game")
-        self.root.attributes("-fullscreen", True)
-        self.root.configure(bg="#0f172a")
-
-        # ESC = Exit Fullscreen
-        self.root.bind(
-            "<Escape>",
-            self.exit_fullscreen
-        )
-
-        # ================= SETTINGS =================
-
-        self.difficulties = {
-            "Easy": {
-                "max_number": 50,
-                "attempts": 10,
-                "time": 60
-            },
-
-            "Medium": {
-                "max_number": 100,
-                "attempts": 7,
-                "time": 45
-            },
-
-            "Hard": {
-                "max_number": 500,
-                "attempts": 5,
-                "time": 30
-            }
-        }
-
-        self.high_score = 0
-        self.timer_id = None
-
-        # ================= VARIABLES =================
-
-        self.secret_number = 0
-        self.attempts = 0
-        self.max_attempts = 7
-        self.time_left = 45
-        self.score = 100
-        self.hint_used = False
-        self.game_over = False
-
-        # ================= GUI =================
-
-        self.create_gui()
-
-        self.new_game()
-
-    # ==================================================
-    # FULLSCREEN
-    # ==================================================
-
-    def exit_fullscreen(self, event=None):
-
-        self.root.attributes(
-            "-fullscreen",
-            False
-        )
-
-        try:
-            self.root.state("zoomed")
-        except:
-            pass
-
-    # ==================================================
-    # SOUND SYSTEM
-    # ==================================================
-
-    def beep(self, frequency, duration):
-
-        """
-        Windows built-in sound.
-        Runs in separate thread so GUI doesn't freeze.
-        """
-
-        def sound():
-
-            try:
-                winsound.Beep(
-                    frequency,
-                    duration
-                )
-            except:
-                pass
-
-        threading.Thread(
-            target=sound,
-            daemon=True
-        ).start()
-
-    # ==================================================
-    # CLICK SOUND
-    # ==================================================
-
-    def sound_click(self):
-
-        self.beep(
-            700,
-            100
-        )
-
-    # ==================================================
-    # WRONG SOUND
-    # ==================================================
-
-    def sound_wrong(self):
-
-        def sound():
-
-            try:
-                winsound.Beep(
-                    350,
-                    120
-                )
-
-                winsound.Beep(
-                    250,
-                    150
-                )
-
-            except:
-                pass
-
-        threading.Thread(
-            target=sound,
-            daemon=True
-        ).start()
-
-    # ==================================================
-    # HINT SOUND
-    # ==================================================
-
-    def sound_hint(self):
-
-        def sound():
-
-            try:
-                winsound.Beep(
-                    700,
-                    100
-                )
-
-                winsound.Beep(
-                    900,
-                    120
-                )
-
-            except:
-                pass
-
-        threading.Thread(
-            target=sound,
-            daemon=True
-        ).start()
-
-    # ==================================================
-    # WIN SOUND
-    # ==================================================
-
-    def sound_win(self):
-
-        def sound():
-
-            try:
-
-                winsound.Beep(
-                    700,
-                    120
-                )
-
-                winsound.Beep(
-                    900,
-                    120
-                )
-
-                winsound.Beep(
-                    1100,
-                    120
-                )
-
-                winsound.Beep(
-                    1400,
-                    250
-                )
-
-            except:
-                pass
-
-        threading.Thread(
-            target=sound,
-            daemon=True
-        ).start()
-
-    # ==================================================
-    # GAME OVER SOUND
-    # ==================================================
-
-    def sound_gameover(self):
-
-        def sound():
-
-            try:
-
-                winsound.Beep(
-                    500,
-                    180
-                )
-
-                winsound.Beep(
-                    400,
-                    180
-                )
-
-                winsound.Beep(
-                    300,
-                    300
-                )
-
-            except:
-                pass
-
-        threading.Thread(
-            target=sound,
-            daemon=True
-        ).start()
-
-    # ==================================================
-    # COUNTDOWN SOUND
-    # ==================================================
-
-    def sound_countdown(self):
-
-        self.beep(
-            1000,
-            120
-        )
-
-    # ==================================================
-    # CREATE GUI
-    # ==================================================
-
-    def create_gui(self):
-
-        # ================= MAIN =================
-
-        main = tk.Frame(
-            self.root,
-            bg="#0f172a"
-        )
-
-        main.pack(
-            fill="both",
-            expand=True
-        )
-
-        # ================= TITLE =================
-
-        tk.Label(
-            main,
-            text="🎯 NUMBER GUESSING GAME",
-            font=("Segoe UI", 34, "bold"),
-            fg="#38bdf8",
-            bg="#0f172a"
-        ).pack(
-            pady=(40, 5)
-        )
-
-        tk.Label(
-            main,
-            text="Guess the secret number before your time runs out!",
-            font=("Segoe UI", 13),
-            fg="#94a3b8",
-            bg="#0f172a"
-        ).pack()
-
-        # ================= DIFFICULTY =================
-
-        top = tk.Frame(
-            main,
-            bg="#0f172a"
-        )
-
-        top.pack(
-            pady=20
-        )
-
-        tk.Label(
-            top,
-            text="Difficulty:",
-            font=("Segoe UI", 12, "bold"),
-            fg="#cbd5e1",
-            bg="#0f172a"
-        ).pack(
-            side="left"
-        )
-
-        self.difficulty = tk.StringVar(
-            value="Medium"
-        )
-
-        self.difficulty_menu = tk.OptionMenu(
-            top,
-            self.difficulty,
-            "Easy",
-            "Medium",
-            "Hard",
-            command=self.change_difficulty
-        )
-
-        self.difficulty_menu.config(
-            bg="#334155",
-            fg="white",
-            activebackground="#475569",
-            activeforeground="white",
-            font=("Segoe UI", 11, "bold"),
-            width=12,
-            relief="flat"
-        )
-
-        self.difficulty_menu.pack(
-            side="left",
-            padx=10
-        )
-
-        # ================= CARD =================
-
-        self.card = tk.Frame(
-            main,
-            bg="#1e293b",
-            width=680,
-            height=610
-        )
-
-        self.card.pack()
-
-        self.card.pack_propagate(
-            False
-        )
-
-        # ================= RANGE =================
-
-        self.range_label = tk.Label(
-            self.card,
-            text="",
-            font=("Segoe UI", 16, "bold"),
-            fg="#e2e8f0",
-            bg="#1e293b"
-        )
-
-        self.range_label.pack(
-            pady=(30, 20)
-        )
-
-        # ================= STATS =================
-
-        stats = tk.Frame(
-            self.card,
-            bg="#1e293b"
-        )
-
-        stats.pack()
-
-        # Attempts
-
-        self.attempt_box = self.create_stat_box(
-            stats,
-            "ATTEMPTS",
-            "#38bdf8"
-        )
-
-        self.attempt_box.pack(
-            side="left",
-            padx=8
-        )
-
-        # Timer
-
-        self.timer_box = self.create_stat_box(
-            stats,
-            "TIME",
-            "#22c55e"
-        )
-
-        self.timer_box.pack(
-            side="left",
-            padx=8
-        )
-
-        # Score
-
-        self.score_box = self.create_stat_box(
-            stats,
-            "HIGH SCORE",
-            "#facc15"
-        )
-
-        self.score_box.pack(
-            side="left",
-            padx=8
-        )
-
-        # ================= PROGRESS =================
-
-        self.progress = tk.Canvas(
-            self.card,
-            width=530,
-            height=14,
-            bg="#334155",
-            highlightthickness=0
-        )
-
-        self.progress.pack(
-            pady=25
-        )
-
-        # ================= INPUT LABEL =================
-
-        tk.Label(
-            self.card,
-            text="ENTER YOUR GUESS",
-            font=("Segoe UI", 10, "bold"),
-            fg="#94a3b8",
-            bg="#1e293b"
-        ).pack()
-
-        # ================= INPUT =================
-
-        self.entry = tk.Entry(
-            self.card,
-            font=("Segoe UI", 24, "bold"),
-            justify="center",
-            width=12,
-            bg="#0f172a",
-            fg="white",
-            insertbackground="white",
-            relief="flat"
-        )
-
-        self.entry.pack(
-            pady=12,
-            ipady=8
-        )
-
-        self.entry.focus()
-
-        # ================= BUTTONS =================
-
-        buttons = tk.Frame(
-            self.card,
-            bg="#1e293b"
-        )
-
-        buttons.pack()
-
-        # Guess
-
-        self.guess_button = tk.Button(
-            buttons,
-            text="🎯 GUESS",
-            font=("Segoe UI", 12, "bold"),
-            bg="#0284c7",
-            fg="white",
-            activebackground="#0369a1",
-            relief="flat",
-            cursor="hand2",
-            width=16,
-            command=self.check_guess
-        )
-
-        self.guess_button.pack(
-            side="left",
-            padx=6,
-            ipady=8
-        )
-
-        # Hint
-
-        self.hint_button = tk.Button(
-            buttons,
-            text="💡 HINT",
-            font=("Segoe UI", 12, "bold"),
-            bg="#7c3aed",
-            fg="white",
-            activebackground="#6d28d9",
-            relief="flat",
-            cursor="hand2",
-            width=16,
-            command=self.show_hint
-        )
-
-        self.hint_button.pack(
-            side="left",
-            padx=6,
-            ipady=8
-        )
-
-        # ================= RESULT =================
-
-        self.result_label = tk.Label(
-            self.card,
-            text="",
-            font=("Segoe UI", 13, "bold"),
-            fg="white",
-            bg="#1e293b",
-            wraplength=500,
-            justify="center"
-        )
-
-        self.result_label.pack(
-            pady=20
-        )
-
-        # ================= NEW GAME =================
-
-        tk.Button(
-            self.card,
-            text="🔄 NEW GAME",
-            font=("Segoe UI", 11, "bold"),
-            bg="#475569",
-            fg="white",
-            activebackground="#64748b",
-            relief="flat",
-            cursor="hand2",
-            width=34,
-            command=self.new_game
-        ).pack(
-            ipady=7
-        )
-
-        # ================= FOOTER =================
-
-        tk.Label(
-            main,
-            text="Press ESC to exit fullscreen",
-            font=("Segoe UI", 9),
-            fg="#64748b",
-            bg="#0f172a"
-        ).pack(
-            pady=12
-        )
-
-        # Enter key
-
-        self.root.bind(
-            "<Return>",
-            lambda event: self.check_guess()
-        )
-
-    # ==================================================
-    # STAT BOX
-    # ==================================================
-
-    def create_stat_box(
-        self,
-        parent,
-        title,
-        text_color
-    ):
-
-        box = tk.Frame(
-            parent,
-            bg="#334155",
-            width=160,
-            height=80
-        )
-
-        box.pack_propagate(
-            False
-        )
-
-        tk.Label(
-            box,
-            text=title,
-            font=("Segoe UI", 9, "bold"),
-            fg="#94a3b8",
-            bg="#334155"
-        ).pack(
-            pady=(10, 0)
-        )
-
-        label = tk.Label(
-            box,
-            text="0",
-            font=("Segoe UI", 17, "bold"),
-            fg=text_color,
-            bg="#334155"
-        )
-
-        label.pack()
-
-        # Save reference
-
-        if title == "ATTEMPTS":
-
-            self.attempt_label = label
-
-        elif title == "TIME":
-
-            self.timer_label = label
-
-        elif title == "HIGH SCORE":
-
-            self.score_label = label
-
-        return box
-
-    # ==================================================
-    # DIFFICULTY
-    # ==================================================
-
-    def change_difficulty(self, value):
-
-        self.sound_click()
-
-        if self.timer_id:
-
-            try:
-                self.root.after_cancel(
-                    self.timer_id
-                )
-            except:
-                pass
-
-        self.new_game()
-
-    # ==================================================
-    # NEW GAME
-    # ==================================================
-
-    def new_game(self):
-
-        settings = self.difficulties[
-            self.difficulty.get()
-        ]
-
-        self.max_number = settings[
-            "max_number"
-        ]
-
-        self.max_attempts = settings[
-            "attempts"
-        ]
-
-        self.time_left = settings[
-            "time"
-        ]
-
-        self.secret_number = random.randint(
-            1,
-            self.max_number
-        )
-
-        self.attempts = 0
-        self.score = 100
-        self.hint_used = False
-        self.game_over = False
-
-        self.range_label.config(
-            text=f"🔢 Guess a number between 1 and {self.max_number}"
-        )
-
-        self.attempt_label.config(
-            text=f"0 / {self.max_attempts}"
-        )
-
-        self.timer_label.config(
-            text=f"{self.time_left}s",
-            fg="#22c55e"
-        )
-
-        self.score_label.config(
-            text=str(self.high_score)
-        )
-
-        self.result_label.config(
-            text="🚀 Make your first guess!",
-            fg="white"
-        )
-
-        self.guess_button.config(
-            state=tk.NORMAL
-        )
-
-        self.hint_button.config(
-            state=tk.NORMAL
-        )
-
-        self.entry.config(
-            state=tk.NORMAL
-        )
-
-        self.entry.delete(
-            0,
-            tk.END
-        )
-
-        self.entry.focus()
-
-        self.update_progress()
-
-        if self.timer_id:
-
-            try:
-                self.root.after_cancel(
-                    self.timer_id
-                )
-            except:
-                pass
-
-        self.timer()
-
-    # ==================================================
-    # TIMER
-    # ==================================================
-
-    def timer(self):
-
-        if self.game_over:
-            return
-
-        self.timer_label.config(
-            text=f"{self.time_left}s"
-        )
-
-        # Last 10 seconds
-
-        if self.time_left <= 10:
-
-            self.timer_label.config(
-                fg="#ef4444"
-            )
-
-            self.sound_countdown()
-
-        # Last 20 seconds
-
-        elif self.time_left <= 20:
-
-            self.timer_label.config(
-                fg="#f59e0b"
-            )
-
-        else:
-
-            self.timer_label.config(
-                fg="#22c55e"
-            )
-
-        # Time over
-
-        if self.time_left <= 0:
-
-            self.game_over = True
-
-            self.guess_button.config(
-                state=tk.DISABLED
-            )
-
-            self.hint_button.config(
-                state=tk.DISABLED
-            )
-
-            self.entry.config(
-                state=tk.DISABLED
-            )
-
-            self.result_label.config(
-                text=f"⏰ TIME'S UP!\n"
-                     f"The number was {self.secret_number}",
-                fg="#ef4444"
-            )
-
-            self.sound_gameover()
-
-            messagebox.showinfo(
-                "TIME'S UP",
-                f"Time's Up!\n\n"
-                f"The number was "
-                f"{self.secret_number}"
-            )
-
-            return
-
-        self.time_left -= 1
-
-        self.timer_id = self.root.after(
-            1000,
-            self.timer
-        )
-
-    # ==================================================
-    # CHECK GUESS
-    # ==================================================
-
-    def check_guess(self):
-
-        if self.game_over:
-            return
-
-        value = self.entry.get().strip()
-
-        # Empty
-
-        if value == "":
-
-            self.result_label.config(
-                text="❌ Enter a number!",
-                fg="#f87171"
-            )
-
-            self.sound_wrong()
-
-            return
-
-        # Invalid
-
-        try:
-
-            guess = int(value)
-
-        except ValueError:
-
-            self.result_label.config(
-                text="❌ Please enter a valid number!",
-                fg="#f87171"
-            )
-
-            self.sound_wrong()
-
-            self.entry.delete(
-                0,
-                tk.END
-            )
-
-            return
-
-        # Range
-
-        if guess < 1 or guess > self.max_number:
-
-            self.result_label.config(
-                text=f"⚠️ Enter number between "
-                     f"1 and {self.max_number}!",
-                fg="#fbbf24"
-            )
-
-            self.sound_wrong()
-
-            return
-
-        # Click sound
-
-        self.sound_click()
-
-        self.attempts += 1
-
-        # Score
-
-        self.score = max(
-            0,
-            100 - (self.attempts - 1) * 10
-        )
-
-        self.attempt_label.config(
-            text=f"{self.attempts} / {self.max_attempts}"
-        )
-
-        self.update_progress()
-
-        # ================= CORRECT =================
-
-        if guess == self.secret_number:
-
-            self.game_over = True
-
-            final_score = (
-                self.score +
-                self.time_left
-            )
-
-            if self.hint_used:
-
-                final_score -= 15
-
-            final_score = max(
-                0,
-                final_score
-            )
-
-            if final_score > self.high_score:
-
-                self.high_score = final_score
-
-            self.score_label.config(
-                text=str(self.high_score)
-            )
-
-            self.result_label.config(
-                text=f"🎉 PERFECT!\n"
-                     f"You found {self.secret_number}!\n"
-                     f"🏆 Score: {final_score}",
-                fg="#4ade80"
-            )
-
-            self.guess_button.config(
-                state=tk.DISABLED
-            )
-
-            self.hint_button.config(
-                state=tk.DISABLED
-            )
-
-            self.entry.config(
-                state=tk.DISABLED
-            )
-
-            if self.timer_id:
-
-                try:
-                    self.root.after_cancel(
-                        self.timer_id
-                    )
-                except:
-                    pass
-
-            self.sound_win()
-
-            messagebox.showinfo(
-                "🏆 YOU WON!",
-                f"Congratulations!\n\n"
-                f"Number: {self.secret_number}\n"
-                f"Attempts: {self.attempts}\n"
-                f"Time left: {self.time_left}s\n"
-                f"Score: {final_score}"
-            )
-
-            return
-
-        # ================= LOW =================
-
-        if guess < self.secret_number:
-
-            self.result_label.config(
-                text="📉 TOO LOW!\n"
-                     "Try a higher number.",
-                fg="#38bdf8"
-            )
-
-        # ================= HIGH =================
-
-        else:
-
-            self.result_label.config(
-                text="📈 TOO HIGH!\n"
-                     "Try a lower number.",
-                fg="#fb923c"
-            )
-
-        self.sound_wrong()
-
-        # ================= GAME OVER =================
-
-        if self.attempts >= self.max_attempts:
-
-            self.game_over = True
-
-            self.guess_button.config(
-                state=tk.DISABLED
-            )
-
-            self.hint_button.config(
-                state=tk.DISABLED
-            )
-
-            self.entry.config(
-                state=tk.DISABLED
-            )
-
-            if self.timer_id:
-
-                try:
-                    self.root.after_cancel(
-                        self.timer_id
-                    )
-                except:
-                    pass
-
-            self.result_label.config(
-                text=f"😔 GAME OVER!\n"
-                     f"The number was {self.secret_number}",
-                fg="#ef4444"
-            )
-
-            self.sound_gameover()
-
-            messagebox.showinfo(
-                "😔 GAME OVER",
-                f"Game Over!\n\n"
-                f"The correct number was "
-                f"{self.secret_number}"
-            )
-
-            return
-
-        self.entry.delete(
-            0,
-            tk.END
-        )
-
-        self.entry.focus()
-
-    # ==================================================
-    # HINT
-    # ==================================================
-
-    def show_hint(self):
-
-        if self.game_over:
-            return
-
-        if self.hint_used:
-            return
-
-        self.hint_used = True
-
-        self.sound_hint()
-
-        if self.secret_number % 2 == 0:
-
-            parity = "EVEN"
-
-        else:
-
-            parity = "ODD"
-
-        if self.secret_number <= self.max_number // 2:
-
-            position = "FIRST HALF"
-
-        else:
-
-            position = "SECOND HALF"
-
-        self.result_label.config(
-            text=f"💡 HINT\n"
-                 f"The number is {parity}\n"
-                 f"and is in the {position}.",
-            fg="#c084fc"
-        )
-
-        self.hint_button.config(
-            state=tk.DISABLED
-        )
-
-    # ==================================================
-    # PROGRESS
-    # ==================================================
-
-    def update_progress(self):
-
-        self.progress.delete(
-            "all"
-        )
-
-        width = 530
-        height = 14
-
-        percentage = (
-            self.attempts /
-            self.max_attempts
-        )
-
-        filled = int(
-            width * percentage
-        )
-
-        self.progress.create_rectangle(
-            0,
-            0,
-            filled,
-            height,
-            fill="#38bdf8",
-            outline=""
-        )
-
-
-# ======================================================
-# MAIN
-# ======================================================
-
-root = tk.Tk()
-
-game = NumberGuessingGame(
-    root
-)
-
-root.mainloop()
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Number Guessing Game</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --box: #334155;
+    --muted: #94a3b8;
+    --muted2: #64748b;
+    --text: #e2e8f0;
+    --blue: #38bdf8;
+    --green: #22c55e;
+    --yellow: #facc15;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --purple: #7c3aed;
+    --purple2: #c084fc;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    height: 100%;
+    overflow-x: hidden;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 30px 16px 20px;
+  }
+
+  h1.title {
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--blue);
+    margin: 10px 0 5px;
+    text-align: center;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 20px;
+    text-align: center;
+  }
+
+  .difficulty-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .difficulty-row label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #cbd5e1;
+  }
+
+  select#difficulty {
+    background: var(--box);
+    color: white;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 10px;
+    width: 130px;
+    cursor: pointer;
+  }
+
+  .card {
+    background: var(--card);
+    width: 680px;
+    max-width: 92vw;
+    min-height: 610px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 24px;
+  }
+
+  .range-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .stats {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .stat-box {
+    background: var(--box);
+    width: 160px;
+    height: 80px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .stat-title {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  .stat-value {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  #attemptValue { color: var(--blue); }
+  #timeValue { color: var(--green); }
+  #scoreValue { color: var(--yellow); }
+
+  .progress-track {
+    width: 530px;
+    max-width: 100%;
+    height: 14px;
+    background: var(--box);
+    border-radius: 2px;
+    margin-bottom: 25px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--blue);
+    transition: width 0.25s ease;
+  }
+
+  .input-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+
+  input#guessInput {
+    background: var(--bg);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    width: 220px;
+    padding: 14px 0;
+    margin-bottom: 12px;
+    outline: none;
+  }
+
+  input#guessInput:disabled {
+    opacity: 0.5;
+  }
+
+  .buttons {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 14px 0;
+    width: 190px;
+    color: white;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  #guessBtn { background: #0284c7; }
+  #guessBtn:hover:not(:disabled) { background: #0369a1; }
+
+  #hintBtn { background: var(--purple); }
+  #hintBtn:hover:not(:disabled) { background: #6d28d9; }
+
+  #newGameBtn {
+    background: #475569;
+    width: 420px;
+    max-width: 100%;
+    padding: 15px 0;
+    margin-top: 4px;
+  }
+  #newGameBtn:hover { background: #64748b; }
+
+  .result-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    text-align: center;
+    max-width: 500px;
+    min-height: 50px;
+    white-space: pre-line;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+
+  .footer {
+    font-size: 9px;
+    color: var(--muted2);
+    margin-top: 16px;
+    text-align: center;
+  }
+
+  /* Modal (replaces messagebox) */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  .modal-overlay.show { display: flex; }
+
+  .modal-box {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 28px 32px;
+    max-width: 380px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+
+  .modal-body {
+    font-size: 13px;
+    color: var(--text);
+    white-space: pre-line;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+
+  .modal-ok {
+    background: #0284c7;
+    width: 140px;
+    padding: 10px 0;
+  }
+  .modal-ok:hover { background: #0369a1; }
+
+  @media (max-width: 560px) {
+    .card { padding: 24px 14px; min-height: auto; }
+    .stat-box { width: 100px; height: 70px; }
+    .progress-track { width: 100%; }
+    input#guessInput { width: 160px; font-size: 20px; }
+    button { width: 140px; font-size: 11px; }
+    #newGameBtn { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="main">
+  <h1 class="title">🎯 NUMBER GUESSING GAME</h1>
+  <p class="subtitle">Guess the secret number before your time runs out!</p>
+
+  <div class="difficulty-row">
+    <label for="difficulty">Difficulty:</label>
+    <select id="difficulty">
+      <option value="Easy">Easy</option>
+      <option value="Medium" selected>Medium</option>
+      <option value="Hard">Hard</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="range-label" id="rangeLabel">🔢 Guess a number between 1 and 100</div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-title">ATTEMPTS</div>
+        <div class="stat-value" id="attemptValue">0 / 7</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-title">TIME</div>
+        <div class="stat-value" id="timeValue">45s</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-title">HIGH SCORE</div>
+        <div class="stat-value" id="scoreValue">0</div>
+      </div>
+    </div>
+
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+    <div class="input-label">ENTER YOUR GUESS</div>
+    <input type="number" id="guessInput" autocomplete="off" />
+
+    <div class="buttons">
+      <button id="guessBtn">🎯 GUESS</button>
+      <button id="hintBtn">💡 HINT</button>
+    </div>
+
+    <div class="result-label" id="resultLabel">🚀 Make your first guess!</div>
+
+    <button id="newGameBtn">🔄 NEW GAME</button>
+  </div>
+
+  <div class="footer">Press ESC to exit fullscreen</div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-body" id="modalBody"></div>
+    <button class="modal-ok" id="modalOk">OK</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ================= SETTINGS =================
+  const DIFFICULTIES = {
+    Easy:   { maxNumber: 50,  attempts: 10, time: 60 },
+    Medium: { maxNumber: 100, attempts: 7,  time: 45 },
+    Hard:   { maxNumber: 500, attempts: 5,  time: 30 }
+  };
+
+  // ================= STATE =================
+  let highScore = 0;
+  let timerId = null;
+
+  let maxNumber = 100;
+  let secretNumber = 0;
+  let attempts = 0;
+  let maxAttempts = 7;
+  let timeLeft = 45;
+  let score = 100;
+  let hintUsed = false;
+  let gameOver = false;
+
+  // ================= DOM REFS =================
+  const difficultySelect = document.getElementById("difficulty");
+  const rangeLabel = document.getElementById("rangeLabel");
+  const attemptValue = document.getElementById("attemptValue");
+  const timeValue = document.getElementById("timeValue");
+  const scoreValue = document.getElementById("scoreValue");
+  const progressFill = document.getElementById("progressFill");
+  const guessInput = document.getElementById("guessInput");
+  const guessBtn = document.getElementById("guessBtn");
+  const hintBtn = document.getElementById("hintBtn");
+  const resultLabel = document.getElementById("resultLabel");
+  const newGameBtn = document.getElementById("newGameBtn");
+
+  const modalOverlay = document.getElementById("modalOverlay");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalBody = document.getElementById("modalBody");
+  const modalOk = document.getElementById("modalOk");
+
+  // ================= SOUND SYSTEM (Web Audio API replaces winsound) =================
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  // frequency in Hz, duration in ms, startAt = ms delay from now
+  function beep(frequency, duration, startAt = 0) {
+    try {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "square";
+      osc.frequency.value = frequency;
+
+      const startTime = ctx.currentTime + startAt / 1000;
+      const endTime = startTime + duration / 1000;
+
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.15, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(endTime + 0.02);
+    } catch (e) {
+      /* ignore audio errors, same as the try/except in the original */
+    }
+  }
+
+  function soundClick() {
+    beep(700, 100);
+  }
+
+  function soundWrong() {
+    beep(350, 120, 0);
+    beep(250, 150, 120);
+  }
+
+  function soundHint() {
+    beep(700, 100, 0);
+    beep(900, 120, 100);
+  }
+
+  function soundWin() {
+    beep(700, 120, 0);
+    beep(900, 120, 120);
+    beep(1100, 120, 240);
+    beep(1400, 250, 360);
+  }
+
+  function soundGameOver() {
+    beep(500, 180, 0);
+    beep(400, 180, 180);
+    beep(300, 300, 360);
+  }
+
+  function soundCountdown() {
+    beep(1000, 120);
+  }
+
+  // ================= MODAL (replaces messagebox.showinfo) =================
+  function showModal(title, body) {
+    modalTitle.textContent = title;
+    modalBody.textContent = body;
+    modalOverlay.classList.add("show");
+  }
+
+  function hideModal() {
+    modalOverlay.classList.remove("show");
+  }
+
+  modalOk.addEventListener("click", hideModal);
+  modalOverlay.addEventListener("click", (e) => {
+    if (e.target === modalOverlay) hideModal();
+  });
+
+  // ================= DIFFICULTY CHANGE =================
+  difficultySelect.addEventListener("change", () => {
+    soundClick();
+    if (timerId) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+    newGame();
+  });
+
+  // ================= NEW GAME =================
+  function newGame() {
+    const settings = DIFFICULTIES[difficultySelect.value];
+
+    maxNumber = settings.maxNumber;
+    maxAttempts = settings.attempts;
+    timeLeft = settings.time;
+
+    secretNumber = Math.floor(Math.random() * maxNumber) + 1;
+
+    attempts = 0;
+    score = 100;
+    hintUsed = false;
+    gameOver = false;
+
+    rangeLabel.textContent = `🔢 Guess a number between 1 and ${maxNumber}`;
+    attemptValue.textContent = `0 / ${maxAttempts}`;
+
+    timeValue.textContent = `${timeLeft}s`;
+    timeValue.style.color = "var(--green)";
+
+    scoreValue.textContent = String(highScore);
+
+    resultLabel.textContent = "🚀 Make your first guess!";
+    resultLabel.style.color = "white";
+
+    guessBtn.disabled = false;
+    hintBtn.disabled = false;
+    guessInput.disabled = false;
+
+    guessInput.value = "";
+    guessInput.focus();
+
+    updateProgress();
+
+    if (timerId) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+
+    runTimer();
+  }
+
+  // ================= TIMER =================
+  function runTimer() {
+    if (gameOver) return;
+
+    timeValue.textContent = `${timeLeft}s`;
+
+    if (timeLeft <= 10) {
+      timeValue.style.color = "var(--red)";
+      soundCountdown();
+    } else if (timeLeft <= 20) {
+      timeValue.style.color = "var(--amber)";
+    } else {
+      timeValue.style.color = "var(--green)";
+    }
+
+    if (timeLeft <= 0) {
+      gameOver = true;
+
+      guessBtn.disabled = true;
+      hintBtn.disabled = true;
+      guessInput.disabled = true;
+
+      resultLabel.textContent = `⏰ TIME'S UP!\nThe number was ${secretNumber}`;
+      resultLabel.style.color = "var(--red)";
+
+      soundGameOver();
+
+      showModal("TIME'S UP", `Time's Up!\n\nThe number was ${secretNumber}`);
+
+      return;
+    }
+
+    timeLeft -= 1;
+    timerId = setTimeout(runTimer, 1000);
+  }
+
+  // ================= CHECK GUESS =================
+  function checkGuess() {
+    if (gameOver) return;
+
+    const value = guessInput.value.trim();
+
+    if (value === "") {
+      resultLabel.textContent = "❌ Enter a number!";
+      resultLabel.style.color = "#f87171";
+      soundWrong();
+      return;
+    }
+
+    const guess = parseInt(value, 10);
+
+    if (Number.isNaN(guess) || !Number.isInteger(Number(value))) {
+      resultLabel.textContent = "❌ Please enter a valid number!";
+      resultLabel.style.color = "#f87171";
+      soundWrong();
+      guessInput.value = "";
+      return;
+    }
+
+    if (guess < 1 || guess > maxNumber) {
+      resultLabel.textContent = `⚠️ Enter number between 1 and ${maxNumber}!`;
+      resultLabel.style.color = "#fbbf24";
+      soundWrong();
+      return;
+    }
+
+    soundClick();
+
+    attempts += 1;
+    score = Math.max(0, 100 - (attempts - 1) * 10);
+
+    attemptValue.textContent = `${attempts} / ${maxAttempts}`;
+    updateProgress();
+
+    // ================= CORRECT =================
+    if (guess === secretNumber) {
+      gameOver = true;
+
+      let finalScore = score + timeLeft;
+      if (hintUsed) finalScore -= 15;
+      finalScore = Math.max(0, finalScore);
+
+      if (finalScore > highScore) {
+        highScore = finalScore;
+      }
+      scoreValue.textContent = String(highScore);
+
+      resultLabel.textContent = `🎉 PERFECT!\nYou found ${secretNumber}!\n🏆 Score: ${finalScore}`;
+      resultLabel.style.color = "#4ade80";
+
+      guessBtn.disabled = true;
+      hintBtn.disabled = true;
+      guessInput.disabled = true;
+
+      if (timerId) {
+        clearTimeout(timerId);
+        timerId = null;
+      }
+
+      soundWin();
+
+      showModal(
+        "🏆 YOU WON!",
+        `Congratulations!\n\nNumber: ${secretNumber}\nAttempts: ${attempts}\nTime left: ${timeLeft}s\nScore: ${finalScore}`
+      );
+
+      return;
+    }
+
+    // ================= LOW / HIGH =================
+    if (guess < secretNumber) {
+      resultLabel.textContent = "📉 TOO LOW!\nTry a higher number.";
+      resultLabel.style.color = "var(--blue)";
+    } else {
+      resultLabel.textContent = "📈 TOO HIGH!\nTry a lower number.";
+      resultLabel.style.color = "#fb923c";
+    }
+
+    soundWrong();
+
+    // ================= GAME OVER (out of attempts) =================
+    if (attempts >= maxAttempts) {
+      gameOver = true;
+
+      guessBtn.disabled = true;
+      hintBtn.disabled = true;
+      guessInput.disabled = true;
+
+      if (timerId) {
+        clearTimeout(timerId);
+        timerId = null;
+      }
+
+      resultLabel.textContent = `😔 GAME OVER!\nThe number was ${secretNumber}`;
+      resultLabel.style.color = "var(--red)";
+
+      soundGameOver();
+
+      showModal("😔 GAME OVER", `Game Over!\n\nThe correct number was ${secretNumber}`);
+
+      return;
+    }
+
+    guessInput.value = "";
+    guessInput.focus();
+  }
+
+  // ================= HINT =================
+  function showHint() {
+    if (gameOver) return;
+    if (hintUsed) return;
+
+    hintUsed = true;
+    soundHint();
+
+    const parity = secretNumber % 2 === 0 ? "EVEN" : "ODD";
+    const position = secretNumber <= Math.floor(maxNumber / 2) ? "FIRST HALF" : "SECOND HALF";
+
+    resultLabel.textContent = `💡 HINT\nThe number is ${parity}\nand is in the ${position}.`;
+    resultLabel.style.color = "var(--purple2)";
+
+    hintBtn.disabled = true;
+  }
+
+  // ================= PROGRESS =================
+  function updateProgress() {
+    const percentage = attempts / maxAttempts;
+    progressFill.style.width = `${Math.min(100, percentage * 100)}%`;
+  }
+
+  // ================= EVENTS =================
+  guessBtn.addEventListener("click", checkGuess);
+  hintBtn.addEventListener("click", showHint);
+  newGameBtn.addEventListener("click", newGame);
+
+  guessInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") checkGuess();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && document.activeElement !== guessInput) {
+      checkGuess();
+    }
+    if (e.key === "Escape") {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+  });
+
+  // Optional: enter fullscreen on first user interaction (browsers block auto-fullscreen)
+  document.addEventListener(
+    "click",
+    function enableFullscreenOnce() {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+      document.removeEventListener("click", enableFullscreenOnce);
+    },
+    { once: true }
+  );
+
+  // ================= INIT =================
+  newGame();
+})();
+</script>
+
+</body>
+</html>
